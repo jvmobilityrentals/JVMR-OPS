@@ -1,7 +1,12 @@
-// Vercel Serverless Function - forwards to Google Apps Script
+// api/proxy.js
 export default async function handler(req, res) {
-  const GAS_URL = process.env.GAS_URL;       // e.g. https://script.google.com/.../exec
-  const TOKEN   = process.env.SHARED_TOKEN;  // your secret token
+  const GAS_URL = process.env.GAS_URL;
+  const TOKEN   = process.env.SHARED_TOKEN;
+
+  const send = (code, obj) => res.status(code).set({
+    'Access-Control-Allow-Origin': '*',
+    'Content-Type': 'application/json'
+  }).send(JSON.stringify(obj));
 
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -12,7 +17,9 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
 
-  const cors = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  // Helpful diagnostics so we don't hard-crash on missing env
+  if (!GAS_URL) return send(500, { ok:false, message:'GAS_URL env var is missing' });
+  if (!TOKEN)   return send(500, { ok:false, message:'SHARED_TOKEN env var is missing' });
 
   try {
     if (req.method === 'GET') {
@@ -23,8 +30,8 @@ export default async function handler(req, res) {
       u.searchParams.set('token', TOKEN);
 
       const r = await fetch(u, { redirect: 'follow' });
-      const text = await r.text(); // GAS sometimes mislabels content-type
-      return res.status(r.status).set(cors).send(text);
+      const text = await r.text();
+      return res.status(r.status).set({ 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' }).send(text);
     }
 
     if (req.method === 'POST') {
@@ -32,28 +39,26 @@ export default async function handler(req, res) {
       let uid = '', action = '';
       if (ct.includes('application/json')) {
         const body = req.body || {};
-        uid = body.uid || '';
-        action = body.action || '';
+        uid = body.uid || ''; action = body.action || '';
       } else {
-        // x-www-form-urlencoded
         const params = new URLSearchParams(req.body || '');
-        uid = params.get('uid') || '';
-        action = params.get('action') || '';
+        uid = params.get('uid') || ''; action = params.get('action') || '';
       }
 
-      const form = new URLSearchParams({ token: TOKEN, uid, action });
+      const bodyOut = new URLSearchParams({ token: TOKEN, uid, action });
       const r = await fetch(GAS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: form,
+        body: bodyOut,
         redirect: 'follow'
       });
       const text = await r.text();
-      return res.status(r.status).set(cors).send(text);
+      return res.status(r.status).set({ 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' }).send(text);
     }
 
-    return res.status(405).set(cors).send(JSON.stringify({ ok:false, message:'Method not allowed' }));
+    return send(405, { ok:false, message:'Method not allowed' });
   } catch (e) {
-    return res.status(500).set(cors).send(JSON.stringify({ ok:false, message:String(e) }));
+    console.error('Proxy error:', e);
+    return send(500, { ok:false, message: String(e) });
   }
 }
