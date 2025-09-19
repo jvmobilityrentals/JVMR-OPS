@@ -1,5 +1,5 @@
 // service-worker.js
-const CACHE_NAME = 'jvmr-cache-v3'; // bump this to bust old caches
+const CACHE_NAME = 'jvmr-cache-v4'; // bump this to bust old caches
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -37,3 +37,4 @@ self.addEventListener('activate', event => {
     )
   );
 });
+
