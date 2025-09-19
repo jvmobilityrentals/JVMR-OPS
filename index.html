@@ -1,103 +1,177 @@
-<script>
-  // API path on Vercel
-  const WEB_APP_URL = '/api/proxy';
-  let currentType = 'ALL';
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reservations Agenda</title>
 
-  function setType(t) {
-    currentType = t;
-    document.getElementById('f-all').classList.toggle('on', t === 'ALL');
-    document.getElementById('f-d').classList.toggle('on', t === 'D');
-    document.getElementById('f-p').classList.toggle('on', t === 'P');
-    load();
-  }
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0C6CF2" />
+  <!-- Silence favicon 404 -->
+  <link rel="icon" href="data:," />
 
-  function todayISO() {
-    var d = new Date();
-    var m = String(d.getMonth() + 1).padStart(2, '0');
-    var day = String(d.getDate()).padStart(2, '0');
-    return d.getFullYear() + '-' + m + '-' + day;
-  }
+  <!-- Minimal styles -->
+  <style>
+    :root { --bg:#f6f7fb; --card:#fff; --text:#111; --muted:#667085; --brand:#0C6CF2; --ok:#16a34a; --warn:#ef4444; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); }
+    header { padding: 28px 20px 6px; }
+    h1 { margin:0 0 14px; font-size: 36px; }
+    .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .pill { padding:8px 14px; border-radius:999px; border:1px solid #e5e7eb; background:#e9eefb; color:#1f2937; cursor:pointer; font-weight:600; }
+    .pill.on { background:var(--brand); color:#fff; border-color:transparent; }
+    input[type="date"] { padding:9px 12px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; }
+    main { padding: 8px 20px 40px; max-width: 960px; margin:auto; }
+    #list { display:grid; gap:12px; }
+    .card { background:var(--card); border-radius:16px; padding:16px; box-shadow: 0 6px 16px rgba(0,0,0,.05); border:1px solid #eef0f6; }
+    .card.done { opacity:.55; }
+    .row { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
+    .row-ops { margin-top:12px; display:flex; gap:8px; }
+    .h { font-size:18px; font-weight:700; }
+    .muted { color:var(--muted); font-size:14px; margin-top:2px; }
+    .badge { background:#EEF2FF; color:#3730A3; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; }
+    .btn, .action { border:none; cursor:pointer; border-radius:10px; padding:10px 14px; font-weight:700; }
+    .btn { background:#f1f5f9; }
+    .action.del { background:#E0F2FE; color:#075985; }
+    .action.pick { background:#DCFCE7; color:#14532D; }
+    .empty { padding:18px; color:var(--muted); }
+    .tip { color:var(--muted); margin-top:6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Reservations Agenda</h1>
+    <div class="controls">
+      <label>Date:
+        <input id="date" type="date" />
+      </label>
+      <button id="f-all" class="pill on"    type="button">All</button>
+      <button id="f-d"   class="pill"       type="button">Deliveries</button>
+      <button id="f-p"   class="pill"       type="button">Pickups</button>
+    </div>
+  </header>
 
-  function mapsLink(addr) {
-    return 'https://www.google.com/maps?q=' + encodeURIComponent(addr || '');
-  }
+  <main>
+    <div id="list" class="empty">Loading...</div>
+    <div class="tip">Tip: Tap a card's button to mark Delivered / Picked Up. Changes sync to your Google Sheet.</div>
+  </main>
 
-  function card(item) {
-    var win = item.window || '(no window)';
-    var kindTxt = item.kind === 'D' ? 'Delivery' : 'Pickup';
-    var done = item.isDone ? 'done' : '';
-    var btnClass = item.kind === 'D' ? 'del' : 'pick';
-    var btnLabel = item.actionLabel || (item.kind === 'D' ? 'Delivered' : 'Picked Up');
+  <script>
+    // API path on Vercel
+    const WEB_APP_URL = '/api/proxy';
+    let currentType = 'ALL';
 
-    return [
-      '<div class="card ' + done + '" data-uid="' + item.uid + '" data-kind="' + item.kind + '">',
-        '<div class="row">',
-          '<div>',
-            '<div class="h">' + item.name + ' <span class="badge">' + (item.equipment || '') + '</span></div>',
-            '<div class="muted">' + kindTxt + ' • ' + win + ' • ' + (item.source || '') + '</div>',
-            '<div class="muted">' + (item.address || '') + '</div>',
-          '</div>',
-          '<div>',
-            '<button class="action ' + btnClass + '" onclick="doAction(\'' + item.uid + '\',\'' + item.kind + '\')">' + btnLabel + '</button>',
-          '</div>',
-        '</div>',
-        '<div class="row-ops">',
-          '<a class="btn" href="' + mapsLink(item.address) + '" target="_blank">Navigate</a>',
-        '</div>',
-      '</div>'
-    ].join('');
-  }
-
-  function render(items) {
-    var list = document.getElementById('list');
-    if (!items.length) {
-      list.innerHTML = '<div class="empty">No items.</div>';
-      return;
+    function setType(t) {
+      currentType = t;
+      document.getElementById('f-all').classList.toggle('on', t === 'ALL');
+      document.getElementById('f-d').classList.toggle('on', t === 'D');
+      document.getElementById('f-p').classList.toggle('on', t === 'P');
+      load();
     }
-    list.innerHTML = items.map(card).join('');
-  }
 
-  async function load() {
-    var date = document.getElementById('date').value || todayISO();
-    var url = WEB_APP_URL + '?date=' + encodeURIComponent(date) + '&type=' + encodeURIComponent(currentType);
-    var res = await fetch(url);
-    var data = await res.json();
-    if (!data.ok) throw new Error(data.message || 'Load failed');
-    render(data.items || []);
-  }
+    function todayISO() {
+      var d = new Date();
+      var m = String(d.getMonth() + 1).padStart(2, '0');
+      var day = String(d.getDate()).padStart(2, '0');
+      return d.getFullYear() + '-' + m + '-' + day;
+    }
 
-  async function doAction(uid, kind) {
-    var cardEl = document.querySelector('.card[data-uid="' + uid + '"]');
-    var btn = cardEl.querySelector('button.action');
-    var prev = btn.textContent;
-    var action = (kind === 'D') ? 'Delivered' : 'Picked Up';
-    btn.textContent = action + ' ...';
-    try {
-      var body = new URLSearchParams({ uid: uid, action: action });
-      var res = await fetch(WEB_APP_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body
-      });
+    function mapsLink(addr) {
+      return 'https://www.google.com/maps?q=' + encodeURIComponent(addr || '');
+    }
+
+    function card(item) {
+      var win = item.window || '(no window)';
+      var kindTxt = item.kind === 'D' ? 'Delivery' : 'Pickup';
+      var done = item.isDone ? 'done' : '';
+      var btnClass = item.kind === 'D' ? 'del' : 'pick';
+      var btnLabel = item.actionLabel || (item.kind === 'D' ? 'Delivered' : 'Picked Up');
+
+      return [
+        '<div class="card ' + done + '" data-uid="' + item.uid + '" data-kind="' + item.kind + '">',
+          '<div class="row">',
+            '<div>',
+              '<div class="h">' + item.name + ' <span class="badge">' + (item.equipment || '') + '</span></div>',
+              '<div class="muted">' + kindTxt + ' • ' + win + ' • ' + (item.source || '') + '</div>',
+              '<div class="muted">' + (item.address || '') + '</div>',
+            '</div>',
+            '<div>',
+              '<button class="action ' + btnClass + '" onclick="doAction(\'' + item.uid + '\',\'' + item.kind + '\')">' + btnLabel + '</button>',
+            '</div>',
+          '</div>',
+          '<div class="row-ops">',
+            '<a class="btn" href="' + mapsLink(item.address) + '" target="_blank">Navigate</a>',
+          '</div>',
+        '</div>'
+      ].join('');
+    }
+
+    function render(items) {
+      var list = document.getElementById('list');
+      if (!items.length) {
+        list.innerHTML = '<div class="empty">No items.</div>';
+        return;
+      }
+      list.innerHTML = items.map(card).join('');
+    }
+
+    async function load() {
+      var date = document.getElementById('date').value || todayISO();
+      var url = WEB_APP_URL + '?date=' + encodeURIComponent(date) + '&type=' + encodeURIComponent(currentType);
+      var res = await fetch(url);
       var data = await res.json();
-      if (!data.ok) throw new Error(data.message || 'Update failed');
-      btn.textContent = action + ' ✔';
-      cardEl.classList.add('done');
-    } catch (e) {
-      alert('Update failed: ' + e.message);
-      btn.textContent = prev;
+      if (!data.ok) throw new Error(data.message || 'Load failed');
+      render((data.items || []).filter(function(it){
+        if (currentType === 'ALL') return true;
+        return it.kind === currentType;
+      }));
     }
-  }
 
-  // init
-  var dateInput = document.getElementById('date');
-  dateInput.value = todayISO();
-  dateInput.addEventListener('change', load);
+    async function doAction(uid, kind) {
+      var cardEl = document.querySelector('.card[data-uid="' + uid + '"]');
+      var btn = cardEl.querySelector('button.action');
+      var prev = btn.textContent;
+      var action = (kind === 'D') ? 'Delivered' : 'Picked Up';
+      btn.textContent = action + ' ...';
+      try {
+        var body = new URLSearchParams({ uid: uid, action: action });
+        var res = await fetch(WEB_APP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body
+        });
+        var data = await res.json();
+        if (!data.ok) throw new Error(data.message || 'Update failed');
+        btn.textContent = action + ' ✔';
+        cardEl.classList.add('done');
+      } catch (e) {
+        alert('Update failed: ' + e.message);
+        btn.textContent = prev;
+      }
+    }
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/service-worker.js').catch(function(){});
-  }
-  load().catch(function(e) {
-    document.getElementById('list').innerHTML = '<div class="empty">Error: ' + e.message + '</div>';
-  });
-</script>
+    // Run after DOM is ready
+    document.addEventListener('DOMContentLoaded', function () {
+      var dateInput = document.getElementById('date');
+      if (!dateInput) { console.error('Date input with id="date" not found.'); return; }
+
+      dateInput.value = todayISO();
+      dateInput.addEventListener('change', load);
+
+      document.getElementById('f-all').addEventListener('click', function(){ setType('ALL'); });
+      document.getElementById('f-d').addEventListener('click', function(){ setType('D'); });
+      document.getElementById('f-p').addEventListener('click', function(){ setType('P'); });
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/service-worker.js').catch(function(){});
+      }
+
+      load().catch(function(e) {
+        document.getElementById('list').innerHTML =
+          '<div class="empty">Error: ' + e.message + '</div>';
+      });
+    });
+  </script>
+</body>
+</html>
