@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
 
-  // Helpful diagnostics so we don't hard-crash on missing env
+  // Diagnostics so we don't hard-crash
   if (!GAS_URL) return send(500, { ok:false, message:'GAS_URL env var is missing' });
   if (!TOKEN)   return send(500, { ok:false, message:'SHARED_TOKEN env var is missing' });
 
