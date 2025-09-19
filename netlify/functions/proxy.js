@@ -1,83 +1,73 @@
 // netlify/functions/proxy.js
-export default async (request, context) => {
-  const GAS_URL = process.env.GAS_URL;         // e.g. https://script.google.com/macros/s/AKfyc.../exec
-  const TOKEN   = process.env.SHARED_TOKEN;    // your secret token
+export async function handler(event, context) {
+  const GAS_URL = process.env.GAS_URL;
+  const TOKEN   = process.env.SHARED_TOKEN;
 
   // CORS preflight
-  if (request.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 204,
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Max-Age': '86400'
-      }
-    });
+      },
+      body: ''
+    };
   }
 
   try {
-    if (request.method === 'GET') {
-      const url = new URL(request.url);
+    if (event.httpMethod === 'GET') {
+      const url = new URL(event.rawUrl);
       const date = url.searchParams.get('date') || '';
       const type = url.searchParams.get('type') || 'ALL';
 
-      // Forward to GAS with token
       const gasUrl = new URL(GAS_URL);
       gasUrl.searchParams.set('date', date);
       gasUrl.searchParams.set('type', type);
       gasUrl.searchParams.set('token', TOKEN);
 
       const res = await fetch(gasUrl, { redirect: 'follow' });
-      const text = await res.text(); // sometimes GAS content-type isn't perfect
-      return new Response(text, {
-        status: res.status,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
-      });
+      const text = await res.text();
+      return {
+        statusCode: res.status,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        body: text
+      };
     }
 
-    if (request.method === 'POST') {
-      const ct = request.headers.get('content-type') || '';
+    if (event.httpMethod === 'POST') {
+      const ct = event.headers['content-type'] || '';
       let uid = '', action = '';
+
       if (ct.includes('application/json')) {
-        const body = await request.json();
+        const body = JSON.parse(event.body || '{}');
         uid = body.uid || '';
         action = body.action || '';
       } else {
-        const form = await request.formData();
-        uid = form.get('uid') || '';
-        action = form.get('action') || '';
+        const formParams = new URLSearchParams(event.body || '');
+        uid = formParams.get('uid') || '';
+        action = formParams.get('action') || '';
       }
-      const form = new URLSearchParams({ token: TOKEN, uid, action });
 
+      const bodyOut = new URLSearchParams({ token: TOKEN, uid, action });
       const res = await fetch(GAS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: form,
+        body: bodyOut,
         redirect: 'follow'
       });
       const text = await res.text();
-      return new Response(text, {
-        status: res.status,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
-      });
+      return {
+        statusCode: res.status,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        body: text
+      };
     }
 
-    return new Response(JSON.stringify({ ok:false, message:'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-    });
-
+    return { statusCode: 405, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ ok:false, message:'Method not allowed' }) };
   } catch (err) {
-    return new Response(JSON.stringify({ ok:false, message:String(err) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-    });
+    return { statusCode: 500, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ ok:false, message:String(err) }) };
   }
-};
+}
