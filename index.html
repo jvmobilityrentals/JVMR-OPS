@@ -47,10 +47,8 @@
   </footer>
 
   <script>
-  // Call our Netlify Function (proxy), not Google directly
-  const WEB_APP_URL = '/.netlify/functions/proxy';
-
-  // We'll pass only date/type from the browser; the function will inject the secure token
+  // For Vercel: our API route is /api/proxy
+  const WEB_APP_URL = '/api/proxy';
   let currentType = 'ALL';
 
   function setType(t){
@@ -106,7 +104,7 @@
   }
 
   async function doAction(uid, kind){
-    const cardEl = document.querySelector(`.card[data-uid="${uid}"]`);
+    const cardEl = document.querySelector(\`.card[data-uid="\${uid}"]\`);
     const btn = cardEl.querySelector('button.action');
     const prev = btn.textContent;
     const action = (kind==='D') ? 'Delivered' : 'Picked Up';
