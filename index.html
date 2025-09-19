@@ -1,138 +1,103 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>JVMR – Reservations Agenda</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0C6CF2" />
-  <style>
-    body{font-family:system-ui, Arial, sans-serif;margin:16px;background:#f7f7f9}
-    h1{margin:0 0 12px}
-    .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
-    .controls input[type="date"]{padding:8px;border-radius:8px;border:1px solid #ddd}
-    .filters button{border:0;border-radius:999px;padding:8px 12px;cursor:pointer;background:#e6eaf3}
-    .filters .on{background:#0C6CF2;color:#fff}
-    .card{background:#fff;border-radius:12px;padding:12px;margin:10px 0;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-    .row{display:flex;justify-content:space-between;gap:10px;align-items:center}
-    .h{font-weight:600}
-    .muted{color:#666;font-size:.9rem}
-    .badge{display:inline-block;background:#eef;padding:2px 8px;border-radius:999px;font-size:.8rem}
-    button.action{border:0;border-radius:10px;padding:10px 12px;cursor:pointer}
-    .del{background:#10b981;color:#fff}
-    .pick{background:#3b82f6;color:#fff}
-    .done{opacity:.6}
-    .row-ops{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
-    a.btn{padding:8px 10px;border-radius:10px;background:#f1f5f9;text-decoration:none;color:#111}
-    .empty{color:#666;margin-top:8px}
-    footer{margin-top:24px;color:#666;font-size:.85rem}
-  </style>
-</head>
-<body>
-  <h1>Reservations Agenda</h1>
-
-  <div class="controls">
-    <label>Date: <input id="date" type="date"></label>
-    <div class="filters">
-      <button id="f-all" class="on" onclick="setType('ALL')">All</button>
-      <button id="f-d" onclick="setType('D')">Deliveries</button>
-      <button id="f-p" onclick="setType('P')">Pickups</button>
-    </div>
-  </div>
-
-  <div id="list"><div class="empty">Loading…</div></div>
-
-  <footer>
-    <div>Tip: Tap a card's button to mark Delivered / Picked Up. Changes sync to your Google Sheet.</div>
-  </footer>
-
-  <script>
-  // For Vercel: our API route is /api/proxy
+<script>
+  // API path on Vercel
   const WEB_APP_URL = '/api/proxy';
   let currentType = 'ALL';
 
-  function setType(t){
+  function setType(t) {
     currentType = t;
-    document.getElementById('f-all').classList.toggle('on', t==='ALL');
-    document.getElementById('f-d').classList.toggle('on', t==='D');
-    document.getElementById('f-p').classList.toggle('on', t==='P');
+    document.getElementById('f-all').classList.toggle('on', t === 'ALL');
+    document.getElementById('f-d').classList.toggle('on', t === 'D');
+    document.getElementById('f-p').classList.toggle('on', t === 'P');
     load();
   }
-  function todayISO(){
-    const d=new Date(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0');
-    return `${d.getFullYear()}-${m}-${day}`;
-  }
-  function mapsLink(addr){ return `https://www.google.com/maps?q=${encodeURIComponent(addr||'')}`; }
 
-  function card(item){
-    const win = item.window || '(no window)';
-    const kindTxt = item.kind==='D' ? 'Delivery' : 'Pickup';
-    const done = item.isDone ? 'done' : '';
-    const btnClass = item.kind==='D' ? 'del' : 'pick';
-    const btnLabel = item.actionLabel || (item.kind==='D' ? 'Delivered' : 'Picked Up');
-    return `
-      <div class="card ${done}" data-uid="${item.uid}" data-kind="${item.kind}">
-        <div class="row">
-          <div>
-            <div class="h">${item.name} <span class="badge">${item.equipment || ''}</span></div>
-            <div class="muted">${kindTxt} • ${win} • ${item.source || ''}</div>
-            <div class="muted">${item.address || ''}</div>
-          </div>
-          <div>
-            <button class="action ${btnClass}" onclick="doAction('${item.uid}','${item.kind}')">${btnLabel}</button>
-          </div>
-        </div>
-        <div class="row-ops">
-          <a class="btn" href="${mapsLink(item.address)}" target="_blank">Navigate</a>
-        </div>
-      </div>`;
+  function todayISO() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
   }
 
-  function render(items){
-    const list = document.getElementById('list');
-    if (!items.length) { list.innerHTML = '<div class="empty">No items.</div>'; return; }
+  function mapsLink(addr) {
+    return 'https://www.google.com/maps?q=' + encodeURIComponent(addr || '');
+  }
+
+  function card(item) {
+    var win = item.window || '(no window)';
+    var kindTxt = item.kind === 'D' ? 'Delivery' : 'Pickup';
+    var done = item.isDone ? 'done' : '';
+    var btnClass = item.kind === 'D' ? 'del' : 'pick';
+    var btnLabel = item.actionLabel || (item.kind === 'D' ? 'Delivered' : 'Picked Up');
+
+    return [
+      '<div class="card ' + done + '" data-uid="' + item.uid + '" data-kind="' + item.kind + '">',
+        '<div class="row">',
+          '<div>',
+            '<div class="h">' + item.name + ' <span class="badge">' + (item.equipment || '') + '</span></div>',
+            '<div class="muted">' + kindTxt + ' • ' + win + ' • ' + (item.source || '') + '</div>',
+            '<div class="muted">' + (item.address || '') + '</div>',
+          '</div>',
+          '<div>',
+            '<button class="action ' + btnClass + '" onclick="doAction(\'' + item.uid + '\',\'' + item.kind + '\')">' + btnLabel + '</button>',
+          '</div>',
+        '</div>',
+        '<div class="row-ops">',
+          '<a class="btn" href="' + mapsLink(item.address) + '" target="_blank">Navigate</a>',
+        '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function render(items) {
+    var list = document.getElementById('list');
+    if (!items.length) {
+      list.innerHTML = '<div class="empty">No items.</div>';
+      return;
+    }
     list.innerHTML = items.map(card).join('');
   }
 
-  async function load(){
-    const date = document.getElementById('date').value || todayISO();
-    const url = WEB_APP_URL + `?date=${encodeURIComponent(date)}&type=${encodeURIComponent(currentType)}`;
-    const res = await fetch(url);
-    const data = await res.json();
+  async function load() {
+    var date = document.getElementById('date').value || todayISO();
+    var url = WEB_APP_URL + '?date=' + encodeURIComponent(date) + '&type=' + encodeURIComponent(currentType);
+    var res = await fetch(url);
+    var data = await res.json();
     if (!data.ok) throw new Error(data.message || 'Load failed');
     render(data.items || []);
   }
 
-  async function doAction(uid, kind){
-    const cardEl = document.querySelector(\`.card[data-uid="\${uid}"]\`);
-    const btn = cardEl.querySelector('button.action');
-    const prev = btn.textContent;
-    const action = (kind==='D') ? 'Delivered' : 'Picked Up';
-    btn.textContent = action + ' …';
-    try{
-      const body = new URLSearchParams({ uid, action });
-      const res = await fetch(WEB_APP_URL, {
+  async function doAction(uid, kind) {
+    var cardEl = document.querySelector('.card[data-uid="' + uid + '"]');
+    var btn = cardEl.querySelector('button.action');
+    var prev = btn.textContent;
+    var action = (kind === 'D') ? 'Delivered' : 'Picked Up';
+    btn.textContent = action + ' ...';
+    try {
+      var body = new URLSearchParams({ uid: uid, action: action });
+      var res = await fetch(WEB_APP_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body
+        body: body
       });
-      const data = await res.json();
+      var data = await res.json();
       if (!data.ok) throw new Error(data.message || 'Update failed');
       btn.textContent = action + ' ✔';
       cardEl.classList.add('done');
-    }catch(e){
+    } catch (e) {
       alert('Update failed: ' + e.message);
       btn.textContent = prev;
     }
   }
 
   // init
-  const dateInput = document.getElementById('date');
+  var dateInput = document.getElementById('date');
   dateInput.value = todayISO();
   dateInput.addEventListener('change', load);
 
-  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/service-worker.js').catch(()=>{}); }
-  load().catch(e => { document.getElementById('list').innerHTML = '<div class="empty">Error: '+e.message+'</div>'; });
-  </script>
-</body>
-</html>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js').catch(function(){});
+  }
+  load().catch(function(e) {
+    document.getElementById('list').innerHTML = '<div class="empty">Error: ' + e.message + '</div>';
+  });
+</script>
